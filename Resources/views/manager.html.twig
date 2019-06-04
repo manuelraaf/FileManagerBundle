@@ -24,11 +24,13 @@
     <div class="container-fluid ">
         <div class="row top-bar" id="top-bar">
             {% block actions %}
-                <a type="button" title="{{ 'button.tree'|trans }}"
-                   href="{{ path('file_manager', fileManager.queryParameters|merge({'tree': fileManager.tree == true ? 0 : 1 })) }}"
-                   class="btn btn-sm btn-default {{ fileManager.tree ? 'active' }}">
-                    <span class="fas fa-bars"></span>
-                </a>
+                {% if fileManager.configuration.disable_treeview == false %}
+                    <a type="button" title="{{ 'button.tree'|trans }}"
+                       href="{{ path('file_manager', fileManager.queryParameters|merge({'tree': fileManager.tree == true ? 0 : 1 })) }}"
+                       class="btn btn-sm btn-default {{ fileManager.tree ? 'active' }}">
+                        <span class="fas fa-bars"></span>
+                    </a>
+                {%  endif %}
                 {% if fileManager.parent %}
                     <a class="btn btn-default btn-sm"
                        title="{{ 'button.parent'|trans }}"
@@ -52,7 +54,7 @@
                     <span class="far fa-folder-open"></span>
                     <span>{{ 'button.add.folder'|trans }}</span>
                 </button>
-                {% if fileManager.parent %}
+                {% if fileManager.parent and fileManager.configuration.disable_delete == false %}
                     <button type="button"
                             class="btn btn-sm btn-danger btn-action js-delete-modal"
                             data-trigger="click"
@@ -66,6 +68,7 @@
                         <span>{{ 'button.delete.current'|trans }}</span>
                     </button>
                 {% endif %}
+                {%  if fileManager.configuration.disable_delete == false %}
                 <a id="js-delete-multiple-modal"
                    class="btn btn-sm btn-danger btn-action disabled"
                    type="button"
@@ -78,6 +81,7 @@
                     <span class="far fa-check-square"></span>
                     <span>{{ 'button.delete.selected'|trans }}</span>
                 </a>
+                {% endif %}
             {% endblock %}
             {% block display %}
                 <div class="btn-group pull-right">
@@ -99,7 +103,7 @@
             {% endblock %}
         </div>
         <div class="row">
-            {% if fileManager.tree %}
+            {% if fileManager.tree and fileManager.configuration.disable_treeview == false %}
             <div class="col-xs-12  col-sm-4 col-md-3 col-lg-2">
                 {% block tree %}
                     <div class="table-responsive">
@@ -135,15 +139,18 @@
     <script type="text/javascript" src="{{ asset('bundles/artgrisfilemanager/libs/jquery-lazy/jquery.lazy.min.js') }}"></script>
     <script>
         var treedata = {{ treeData|raw }};
-        var tree = {{ fileManager.tree ? 'true' : 'false' }}
+        var tree = {{ fileManager.tree ? 'true' : 'false' }};
         var moduleName = '{{ fileManager.module ? fileManager.module : 0 }}';
         var successMessage = '{{ 'file.add.success'|trans }}';
-        var url = "{{ path('file_manager', fileManager.queryParameters|merge({'json':true}))|e('js') }}"
-        var urldelete = "{{ path('file_manager_delete', fileManager.queryParameters )|e('js') }}"
-        var deleteMessage = "{{ 'title.delete'|trans }}"
-        var renameMessage = "{{ 'title.rename.file'|trans }}"
-        var downloadMessage = "{{ 'title.download'|trans }}"
-        var previewMessage = "{{ 'title.preview.file'|trans }}"
+        var url = "{{ path('file_manager', fileManager.queryParameters|merge({'json':true}))|e('js') }}";
+        var urldelete = "{{ path('file_manager_delete', fileManager.queryParameters )|e('js') }}";
+        var deleteDisabled = {{ fileManager.configuration.disable_delete|default(0) }};
+        var deleteMessage = "{{ 'title.delete'|trans }}";
+        var renameDisabled = {{ fileManager.configuration.disable_rename|default(0) }};
+        var renameMessage = "{{ 'title.rename.file'|trans }}";
+        var downloadDisabled = {{ fileManager.configuration.disable_download|default(0) }};
+        var downloadMessage = "{{ 'title.download'|trans }}";
+        var previewMessage = "{{ 'title.preview.file'|trans }}";
     </script>
     <script>
         // display alert

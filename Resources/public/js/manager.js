@@ -3,25 +3,32 @@ $(function () {
     var $renameModal = $('#js-confirm-rename');
     var $deleteModal = $('#js-confirm-delete');
     var $displayModal = $('#js-display-image');
+
     var callback = function (key, opt) {
         switch (key) {
             case 'edit':
-                var $renameModalButton = opt.$trigger.find(".js-rename-modal")
-                renameFile($renameModalButton)
-                $renameModal.modal("show");
+                if (!renameDisabled) {
+                    var $renameModalButton = opt.$trigger.find(".js-rename-modal");
+                    renameFile($renameModalButton);
+                    $renameModal.modal("show");
+                }
                 break;
             case 'delete':
-                var $deleteModalButton = opt.$trigger.find(".js-delete-modal")
-                deleteFile($deleteModalButton)
-                $deleteModal.modal("show");
+                if (!deleteDisabled) {
+                    var $deleteModalButton = opt.$trigger.find(".js-delete-modal");
+                    deleteFile($deleteModalButton);
+                    $deleteModal.modal("show");
+                }
                 break;
             case 'download':
-                var $downloadButton = opt.$trigger.find(".js-download")
-                downloadFile($downloadButton)
+                if (!downloadDisabled) {
+                    var $downloadButton = opt.$trigger.find(".js-download");
+                    downloadFile($downloadButton);
+                }
                 break;
             case 'preview':
-                var $previewModalButton = opt.$trigger.find(".js-open-modal")
-                previewFile($previewModalButton)
+                var $previewModalButton = opt.$trigger.find(".js-open-modal");
+                previewFile($previewModalButton);
                 $displayModal.modal("show");
                 break;
         }
@@ -31,18 +38,18 @@ $(function () {
         selector: '.file',
         callback: callback,
         items: {
-            "delete": {name: deleteMessage, icon: "far fa-trash-alt"},
-            "edit": {name: renameMessage, icon: "far fa-edit"},
-            "download": {name: downloadMessage, icon: "fas fa-download"},
+            "delete": deleteDisabled ? {} : {name: deleteMessage, icon: "far fa-trash-alt"},
+            "edit": renameDisabled ? {} : {name: renameMessage, icon: "far fa-edit"},
+            "download": downloadDisabled ? {} : {name: downloadMessage, icon: "fas fa-download"},
         }
     });
     $.contextMenu({
         selector: '.img',
         callback: callback,
         items: {
-            "delete": {name: deleteMessage, icon: "far fa-trash-alt"},
-            "edit": {name: renameMessage, icon: "far fa-edit"},
-            "download": {name: downloadMessage, icon: "fas fa-download"},
+            "delete": deleteDisabled ? {} : {name: deleteMessage, icon: "far fa-trash-alt"},
+            "edit": renameDisabled ? {} : {name: renameMessage, icon: "far fa-edit"},
+            "download": downloadDisabled ? {} : {name: downloadMessage, icon: "fas fa-download"},
             "preview": {name: previewMessage, icon: "fas fa-eye"},
         }
     });
@@ -50,19 +57,23 @@ $(function () {
         selector: '.dir',
         callback: callback,
         items: {
-            "delete": {name: deleteMessage, icon: "far fa-trash-alt"},
-            "edit": {name: renameMessage, icon: "far fa-edit"},
+            "delete": deleteDisabled ? {} : {name: deleteMessage, icon: "far fa-trash-alt"},
+            "edit": renameDisabled ? {} : {name: renameMessage, icon: "far fa-edit"},
         }
     });
 
     function renameFile($renameModalButton) {
-        $('#form_name').val($renameModalButton.data('name'));
-        $('#form_extension').val($renameModalButton.data('extension'));
-        $renameModal.find('form').attr('action', $renameModalButton.data('href'))
+        if (!renameDisabled) {
+            $('#form_name').val($renameModalButton.data('name'));
+            $('#form_extension').val($renameModalButton.data('extension'));
+            $renameModal.find('form').attr('action', $renameModalButton.data('href'));
+        }
     }
 
     function deleteFile($deleteModalButton) {
-        $('#js-confirm-delete').find('form').attr('action', $deleteModalButton.data('href'));
+        if (!deleteDisabled) {
+            $('#js-confirm-delete').find('form').attr('action', $deleteModalButton.data('href'));
+        }
     }
 
     function previewFile($previewModalButton) {

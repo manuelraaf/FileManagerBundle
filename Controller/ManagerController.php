@@ -37,6 +37,9 @@ class ManagerController extends Controller
      */
     protected $fileManager;
 
+    private $isFirstRecursion = true;
+    private $isTreeView = 0;
+
     /**
      * @Route("/", name="file_manager")
      *
@@ -54,10 +57,36 @@ class ManagerController extends Controller
         if ($isJson) {
             unset($queryParameters['json']);
         }
+
         $fileManager = $this->newFileManager($queryParameters);
+        $this->isTreeView = $fileManager->getConfigurationParameter('disable_treeview') == true ? 0 : @intval($fileManager->getQueryParameter("tree"));
+        // fallback if someone sets the query parameter but the config disables the treeview
+        if (empty($this->isTreeView)) {
+            $queryParameters['tree'] = 0;
+            $fileManager->setQueryParameters($queryParameters);
+        }
+
+        // Defines weather to crawl the subdirectories too or not
+        // The value will be decreased in each recursive call!
+        $depth_subdirectories = 0;
+        try {
+            if ($fileManager->getConfigurationParameter('disable_treeview') == false) {
+                if ($fileManager->getConfigurationParameter('depth_subdirectories')) {
+                    $depth_subdirectories = $fileManager->getConfigurationParameter('depth_subdirectories');
+                } else {
+                    try {
+                        $depth_subdirectories = $this->container->getParameter('depth');
+                    } catch (\Exception $e) {
+                        $depth_subdirectories = $this->container->getParameter('depth_subdirectories');
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            $depth_subdirectories = 0;
+        }
 
         // Folder search
-        $directoriesArbo = $this->retrieveSubDirectories($fileManager, $fileManager->getDirName(), DIRECTORY_SEPARATOR, $fileManager->getBaseName());
+        $directoriesArbo = $this->retrieveSubDirectories($fileManager, $fileManager->getDirName(), DIRECTORY_SEPARATOR, $fileManager->getBaseName(), $depth_subdirectories);
 
         // File search
         $finderFiles = new Finder();
@@ -142,7 +171,6 @@ class ManagerController extends Controller
 
         if ($isJson) {
             $fileList = $this->renderView('@ArtgrisFileManager/views/_manager_view.html.twig', $parameters);
-
             return new JsonResponse(['data' => $fileList, 'badge' => $finderFiles->count(), 'treeData' => $directoriesArbo]);
         }
         $parameters['treeData'] = json_encode($directoriesArbo);
@@ -405,10 +433,11 @@ class ManagerController extends Controller
      * @param $path
      * @param string $parent
      * @param bool   $baseFolderName
+     * @param mixed|null $depth_subdirectories
      *
      * @return array|null
      */
-    private function retrieveSubDirectories(FileManager $fileManager, $path, $parent = DIRECTORY_SEPARATOR, $baseFolderName = false)
+    private function retrieveSubDirectories(FileManager $fileManager, $path, $parent = DIRECTORY_SEPARATOR, $baseFolderName = false, $depth_subdirectories = 0)
     {
         $directories = new Finder();
         $directories->in($path)->ignoreUnreadableDirs()->directories()->depth(0)->sortByType()->filter(function (SplFileInfo $file) {
@@ -420,11 +449,38 @@ class ManagerController extends Controller
         }
         $directoriesList = null;
 
+        // decrease $depth if it's set and not equal "all"
+        try {
+            if (strtolower($depth_subdirectories) == "all") {
+                $depth_subdirectories = "all";
+            } else {
+                $depth_subdirectories = intval($depth_subdirectories);
+                if ($this->isFirstRecursion == false || empty($this->isTreeView)) {
+                    $depth_subdirectories--;
+                    if ($depth_subdirectories < 0) {
+                        $depth_subdirectories = 0;
+                    }
+                } else {
+                    $depth_subdirectories++;
+                }
+            }
+        } catch (\Exception $e) {
+            // pass
+        }
+
+        //  must be set to false here, since the recursive call comes inside the following loop
+        $this->isFirstRecursion = false;
+        //  get the queryParameters here since they do not change inside the loop. Thus, it's faster to get them here.
+        $queryParameters = $fileManager->getQueryParameters();
+        //  extract the current route in order to pass it correctly to the recursive call within the loop
+        //      for getting only $depth_subdirectories numbers of subdirectories (if set and not "all")
+        $currentRoute = isset($queryParameters['route']) ? $queryParameters['route'] : "";
+        $currentPosition = substr_count($currentRoute, '/');
+
         foreach ($directories as $directory) {
             /** @var SplFileInfo $directory */
-            $fileName = $baseFolderName ? '' : $parent.$directory->getFilename();
+            $fileName = $baseFolderName ? '' : $parent . $directory->getFilename();
 
-            $queryParameters = $fileManager->getQueryParameters();
             $queryParameters['route'] = $fileName;
             $queryParametersRoute = $queryParameters;
             unset($queryParametersRoute['route']);
@@ -433,12 +489,21 @@ class ManagerController extends Controller
             $fileSpan = $filesNumber > 0 ? " <span class='label label-default'>{$filesNumber}</span>" : '';
 
             $directoriesList[] = [
-                'text' => $directory->getFilename().$fileSpan,
+                'text' => $directory->getFilename() . $fileSpan,
                 'icon' => 'far fa-folder-open',
-                'children' => $this->retrieveSubDirectories($fileManager, $directory->getPathname(), $fileName.DIRECTORY_SEPARATOR),
+                'children' => $depth_subdirectories
+                    ?   $this->retrieveSubDirectories(
+                            $fileManager,
+                            $directory->getPathname(),
+                            $fileName . DIRECTORY_SEPARATOR,
+                            false,
+                            $currentRoute == $fileName ? $depth_subdirectories + $currentPosition - 1 : $depth_subdirectories
+                        )
+                    : null,
                 'a_attr' => [
                     'href' => $fileName ? $this->generateUrl('file_manager', $queryParameters) : $this->generateUrl('file_manager', $queryParametersRoute),
-                ], 'state' => [
+                ],
+                'state' => [
                     'selected' => $fileManager->getCurrentRoute() === $fileName,
                     'opened' => true,
                 ],
@@ -482,11 +547,16 @@ class ManagerController extends Controller
     private function newFileManager($queryParameters)
     {
         if (!isset($queryParameters['conf'])) {
-            throw new \RuntimeException('Please define a conf parameter in your route');
+            $queryParameters['conf'] = "default";
+//            throw new \RuntimeException('Please define a conf parameter in your route');
         }
-        $webDir = $this->getParameter('artgris_file_manager')['web_dir'];
-
-        $this->fileManager = new FileManager($queryParameters, $this->get('artgris_bundle_file_manager.service.filemanager_service')->getBasePath($queryParameters), $this->getKernelRoute(), $this->get('router'), $webDir);
+        $this->fileManager = new FileManager(
+            $queryParameters,
+            $this->get('artgris_bundle_file_manager.service.filemanager_service')->getBasePath($queryParameters),
+            $this->getKernelRoute(),
+            $this->get('router'),
+            $this->getParameter('artgris_file_manager')['web_dir']
+        );
 
         return $this->fileManager;
     }

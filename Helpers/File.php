@@ -47,46 +47,62 @@ class File
 
     public function getDimension()
     {
-        return preg_match('/(gif|png|jpe?g|svg)$/i', $this->file->getExtension()) ?
-            getimagesize($this->file->getPathname()) : '';
+        try {
+            return preg_match('/(gif|png|jpe?g|svg)$/i', $this->file->getExtension()) ?
+                getimagesize($this->file->getPathname()) : '';
+        } catch (\Exception $e) {
+            return '';
+        }
     }
 
     public function getHTMLDimension()
     {
-        $dimension = $this->getDimension();
-        if ($dimension) {
-            return "{$dimension[0]} × {$dimension[1]}";
+        try {
+            $dimension = $this->getDimension();
+            if ($dimension) {
+                return "{$dimension[0]} × {$dimension[1]}";
+            }
+        } catch (\Exception $e) {
+            return '';
         }
     }
 
     public function getHTMLSize()
     {
-        if ('file' === $this->getFile()->getType()) {
-            $size = $this->file->getSize() / 1000;
-            $kb = $this->translator->trans('size.kb');
-            $mb = $this->translator->trans('size.mb');
+        try {
+            if ('file' === $this->getFile()->getType()) {
+                $size = $this->file->getSize() / 1000;
+                $kb = $this->translator->trans('size.kb');
+                $mb = $this->translator->trans('size.mb');
 
-            return $size > 1000 ? number_format(($size / 1000), 1, '.', '').' '.$mb : number_format($size, 1, '.', '').' '.$kb;
+                return $size > 1000 ? number_format(($size / 1000), 1, '.', '').' '.$mb : number_format($size, 1, '.', '').' '.$kb;
+            }
+        } catch (\Exception $e) {
+            return 0;
         }
     }
 
     public function getAttribut()
     {
-        if ($this->fileManager->getModule()) {
-            $attr = '';
-            $dimension = $this->getDimension();
-            if ($dimension) {
-                $width = $dimension[0];
-                $height = $dimension[1];
-                $attr .= "data-width=\"{$width}\" data-height=\"{$height}\" ";
-            }
+        try {
+            if ($this->fileManager->getModule()) {
+                $attr = '';
+                $dimension = $this->getDimension();
+                if ($dimension) {
+                    $width = $dimension[0];
+                    $height = $dimension[1];
+                    $attr .= "data-width=\"{$width}\" data-height=\"{$height}\" ";
+                }
 
-            if ('file' === $this->file->getType()) {
-                $attr .= "data-path=\"{$this->getPreview()['path']}\"";
-                $attr .= ' class="select"';
-            }
+                if ('file' === $this->file->getType()) {
+                    $attr .= "data-path=\"{$this->getPreview()['path']}\"";
+                    $attr .= ' class="select"';
+                }
 
-            return $attr;
+                return $attr;
+            }
+        } catch (\Exception $e) {
+            return '';
         }
     }
 
@@ -116,7 +132,7 @@ class File
      */
     public function getPreview()
     {
-        return $this->preview;
+        return @$this->preview;
     }
 
     /**

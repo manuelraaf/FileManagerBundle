@@ -19,6 +19,7 @@
         </div>
     </div>
 </div>
+{% if fileManager.configuration.disable_rename == false %}
 <div class="modal fade" id="js-confirm-rename" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -41,6 +42,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 <div class="modal fade" id="addFolder" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
